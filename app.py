@@ -11,11 +11,7 @@ import requests
 import io
 import urllib.parse
 
-# --- Load environment variables from .env file ---
 load_dotenv()
-# --- End of dotenv load ---
-
-# --- START: Your Provided Functions (All remain the same) ---
 
 IT_ADMIN = {"name": "IT Security Admin", "email": "it.admin@example.com"}
 DEVOPS = {"name": "DevOps Team", "email": "devops@example.com"}
@@ -288,9 +284,6 @@ def normalize_alert(alert: Dict[str, Any], render_field: str) -> Dict[str, Any]:
     alert["_entity_names"] = list(entity_map_by_name.keys())
     return alert
 
-# --- END: Your Provided Functions ---
-
-# Global variable list based on the normalization function's output
 JINJA_VARIABLES = [
     "alert.primary_render_name", 
     "alert.primary_render_type", 
@@ -307,7 +300,6 @@ JINJA_VARIABLES = [
 ]
 
 def get_alert_context_keys(render_field: str = "Manager") -> Dict[str, Any]:
-    """Helper to get a sample normalized alert context for the AI model."""
     mock_siemplify = MockSiemplifyAction()
     signal_data_str = mock_siemplify.extract_action_param("signal_data", print_value=False)
     
@@ -340,9 +332,10 @@ def get_alert_context_keys(render_field: str = "Manager") -> Dict[str, Any]:
 def convert_html_to_jinja_with_ai(html_content: str, variable_map: Dict[str, Any]) -> str:
     """Uses OpenRouter AI to convert HTML to a Jinja template."""
     api_key = os.environ.get("OPENROUTER_API_KEY")
+    
     if not api_key:
-        raise EnvironmentError("OPENROUTER_API_KEY environment variable not set. Please check your .env file and load_dotenv() call.")
-
+        raise ValueError("OPENROUTER_API_KEY is missing. Please set it in Vercel Environment Variables.")
+    
     variable_list_str = "\n".join([f"- **{{{{ {k} }}}}**: {v}" for k, v in variable_map.items()])
 
     system_prompt = (
@@ -375,7 +368,7 @@ def convert_html_to_jinja_with_ai(html_content: str, variable_map: Dict[str, Any
         "X-Title": "HTML to Jinja Converter"
     }
     data = {
-        "model": "openai/gpt-4o-mini",
+        "model": "perplexity/pplx-70b-online",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
@@ -387,25 +380,29 @@ def convert_html_to_jinja_with_ai(html_content: str, variable_map: Dict[str, Any
             url="https://openrouter.ai/api/v1/chat/completions",
             headers=headers,
             json=data,
-            timeout=60 # Set a generous timeout for the AI response
+            timeout=60
         )
-        response.raise_for_status()
+        response.raise_for_status() 
         
         result = response.json()
         ai_output = result['choices'][0]['message']['content']
         return ai_output.strip()
 
+    except requests.exceptions.HTTPError as http_err:
+        status_code = http_err.response.status_code
+        error_detail = http_err.response.text
+        if status_code == 401:
+             raise Exception(f"API Key Unauthorized (401). Check if OPENROUTER_API_KEY is correct.")
+        raise Exception(f"OpenRouter API HTTP Error {status_code}: {error_detail}")
     except requests.exceptions.RequestException as e:
-        error_msg = f"OpenRouter API Error: {e}"
-        if response is not None:
-             error_msg += f"\nResponse Body: {response.text}"
-        raise Exception(error_msg)
+        raise Exception(f"Network Error: Could not reach OpenRouter API. Details: {e}")
+    except Exception as e:
+        raise Exception(f"Conversion processing failed. Details: {e}")
 
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 
 
-# --- Routes ---
 
 @app.route('/', methods=['GET'])
 def index():
@@ -426,14 +423,16 @@ def index():
         <form method="POST" action="/convert" enctype="multipart/form-data">
           <input type="file" name="html_file" id="html_file" accept=".html,.htm" required>
           <br><br>
-          <input type="submit" value="Convert">
+          <input type="submit" value="Run AI Conversion">
         </form>
-    </div>
+
+        <hr>
+        
+        </div>
     """)
 
 @app.route('/convert', methods=['POST'])
 def convert():
-    # 1. Handle File Upload
     if 'html_file' not in request.files:
         return jsonify({"error": "No file part in the request"}), 400
     
@@ -451,13 +450,10 @@ def convert():
         return jsonify({"error": "Invalid file upload"}), 400
 
     try:
-        # 2. Get the list of variables and their context/types from your script's logic
         variable_map = get_alert_context_keys(render_field="Manager")
 
-        # 3. Use AI to perform the conversion
         jinja_template = convert_html_to_jinja_with_ai(html_content, variable_map)
 
-        # 4. Generate rendered preview with mock data
         mock_siemplify = MockSiemplifyAction()
         signal_data_str = mock_siemplify.extract_action_param("signal_data", print_value=False)
         alert_data = json.loads(signal_data_str)
@@ -470,7 +466,6 @@ def convert():
         template = env.from_string(jinja_template)
         rendered_html = template.render(alert=normalized_alert)
 
-        # 5. Return the result page with the download button
         return render_template_string("""
             <!doctype html>
             <title>Conversion Result</title>
@@ -489,7 +484,7 @@ def convert():
                 <form action="/download" method="POST" style="display: inline;">
                     <input type="hidden" name="template_content" value="{{ jinja_template | urlencode }}">
                     <button type="submit" class="download-btn">
-                        Download converted_template.html
+                        Download converted_jinja_template.html
                     </button>
                 </form>
 
@@ -497,7 +492,7 @@ def convert():
                 <pre>{{ jinja_template }}</pre>
 
                 <h3>Rendered Output (Preview with Mock Data):</h3>
-                <div>
+                <div class="preview">
                     {{ rendered_html | safe }}
                 </div>
                 <hr>
@@ -510,14 +505,18 @@ def convert():
 
     except Exception as e:
         error_message = str(e)
-        return render_template_string(f"""
+        return render_template_string("""
             <!doctype html>
             <title>Conversion Failed</title>
-            <style>body {{ font-family: Arial, sans-serif; }} .error-box {{ border: 1px solid red; padding: 15px; background-color: #fdd; }}</style>
+            <style>
+                body { font-family: Arial, sans-serif; } 
+                .error-box { max-width: 800px; margin: 50px auto; padding: 15px; border: 2px solid red; background-color: #fdd; border-radius: 8px; }
+                .error-box pre { color: red; white-space: pre-wrap; background: #fce; padding: 10px; border: 1px solid #f99; }
+            </style>
             <div class="error-box">
                 <h2>❌ Conversion Failed!</h2>
-                <p>An error occurred during the conversion process. Please check your API key and ensure the HTML file is correctly formatted.</p>
-                <pre style="color: red; white-space: pre-wrap;">{{ error_message }}</pre>
+                <p>An error occurred during the conversion process. This often means the HTML content was malformed or the **API Key is missing/incorrect**.</p>
+                <pre>{{ error_message }}</pre>
                 <hr>
                 <a href="/">Go Back and Try Again</a>
             </div>
@@ -526,15 +525,12 @@ def convert():
 @app.route('/download', methods=['POST'])
 def download_template():
     """Handles the download request by sending the template content."""
-    # Retrieve the template content from the form data
     template_content_encoded = request.form.get('template_content')
     if not template_content_encoded:
         return "Error: Template content not provided.", 400
     
-    # URL-decode the content
     template_content = urllib.parse.unquote(template_content_encoded)
     
-    # Create an in-memory file for sending
     str_io = io.BytesIO()
     str_io.write(template_content.encode('utf-8'))
     str_io.seek(0)
@@ -549,7 +545,7 @@ def download_template():
 
 if __name__ == '__main__':
     if not os.environ.get("OPENROUTER_API_KEY"):
-         print("WARNING: OPENROUTER_API_KEY environment variable not found. Conversion attempts will fail.")
+         print("WARNING: OPENROUTER_API_KEY environment variable not found. Conversion will only work locally if running via `python app.py`.")
 
     print("Running Flask app. Access http://127.0.0.1:5000/")
     app.run(debug=True)
