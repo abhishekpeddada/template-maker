@@ -368,7 +368,7 @@ def convert_html_to_jinja_with_ai(html_content: str, variable_map: Dict[str, Any
         "X-Title": "HTML to Jinja Converter"
     }
     data = {
-        "model": "perplexity/pplx-70b-online",
+        "model": "openai/gpt-4o-mini",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
@@ -423,7 +423,7 @@ def index():
         <form method="POST" action="/convert" enctype="multipart/form-data">
           <input type="file" name="html_file" id="html_file" accept=".html,.htm" required>
           <br><br>
-          <input type="submit" value="Run AI Conversion">
+          <input type="submit" value="Convert">
         </form>
 
         <hr>
