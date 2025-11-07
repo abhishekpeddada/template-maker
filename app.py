@@ -380,7 +380,7 @@ def convert_html_to_jinja_with_ai(html_content: str, variable_map: Dict[str, Any
             url="https://openrouter.ai/api/v1/chat/completions",
             headers=headers,
             json=data,
-            timeout=60
+            timeout=180
         )
         response.raise_for_status() 
         
@@ -549,3 +549,4 @@ if __name__ == '__main__':
 
     print("Running Flask app. Access http://127.0.0.1:5000/")
     app.run(debug=True)
+
