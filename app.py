@@ -409,7 +409,7 @@ def index():
     """Renders the file upload form."""
     return render_template_string("""
     <!doctype html>
-    <title>Flask Jinja Template Converter</title>
+    <title>Template Converter</title>
     <style>
         body { font-family: Arial, sans-serif; }
         .container { max-width: 800px; margin: 0 auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
@@ -417,7 +417,7 @@ def index():
         input[type="submit"]:hover { background-color: #0056b3; }
     </style>
     <div class="container">
-        <h1>Flask Jinja Template Converter</h1>
+        <h1>Template Converter</h1>
         <p>Upload your sample HTML file (e.g., <code>email_body.html</code>) to convert it into a fully functional Jinja template.</p>
         
         <form method="POST" action="/convert" enctype="multipart/form-data">
@@ -549,4 +549,5 @@ if __name__ == '__main__':
 
     print("Running Flask app. Access http://127.0.0.1:5000/")
     app.run(debug=True)
+
 
