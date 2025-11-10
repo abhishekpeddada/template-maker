@@ -368,7 +368,7 @@ def convert_html_to_jinja_with_ai(html_content: str, variable_map: Dict[str, Any
         "X-Title": "HTML to Jinja Converter"
     }
     data = {
-        "model": "deepseek/deepseek-r1:free",
+        "model": "microsoft/mai-ds-r1:free",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
@@ -549,6 +549,7 @@ if __name__ == '__main__':
 
     print("Running Flask app. Access http://127.0.0.1:5000/")
     app.run(debug=True)
+
 
 
 
