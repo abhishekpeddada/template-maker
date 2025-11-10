@@ -89,10 +89,10 @@ def extract_user_manager_data(user_data: Dict[str, Any], user_names_emails: Set[
     display_name = user_data.get("userDisplayName")
     user_principal_name = extract_label_value(user_data.get("attribute", {}), "userPrincipalName")
     if display_name and user_principal_name:
-        user_names_emails.add(f"{display_name} <{user_principal_name}>")
+        user_names_emails.add(f"{display_name}")
     elif display_name:
         emails = user_data.get("emailAddresses", [])
-        if emails: user_names_emails.add(f"{display_name} <{emails[0]}>")
+        if emails: user_names_emails.add(f"{display_name}")
 
     managers = user_data.get("managers", [])
     for manager in managers:
@@ -549,6 +549,7 @@ if __name__ == '__main__':
 
     print("Running Flask app. Access http://127.0.0.1:5000/")
     app.run(debug=True)
+
 
 
 
