@@ -15,6 +15,7 @@ load_dotenv()
 
 IT_ADMIN = {"name": "IT Security Admin", "email": "it.admin@example.com"}
 DEVOPS = {"name": "DevOps Team", "email": "devops@example.com"}
+SEND_TO = "abhishekpeddada@gmail.com"
 class MockSiemplifyAction:
     def extract_action_param(self, name, default_value=None, print_value=True):
         if name == "template": return None
@@ -230,6 +231,7 @@ def normalize_alert(alert: Dict[str, Any], render_field: str) -> Dict[str, Any]:
     extracted_lists = collect_alert_lists(alert)
     alert.update(extracted_lists)
     alert["alert_time_readable"] = iso_to_datetime(alert.get("alert_time"))
+    alert["SEND_TO"] = SEND_TO
     
     manager_names = [s.split(" <")[0] for s in extracted_lists["manager_names_emails"] if " <" in s]
     
@@ -296,7 +298,8 @@ JINJA_VARIABLES = [
     "alert.carriers", 
     "alert.applications", 
     "alert.user_agents", 
-    "alert.login_statuses"
+    "alert.login_statuses",
+    "alert.SEND_TO"
 ]
 
 def get_alert_context_keys(render_field: str = "Manager") -> Dict[str, Any]:
