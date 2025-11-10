@@ -20,8 +20,10 @@ class MockSiemplifyAction:
     def extract_action_param(self, name, default_value=None, print_value=True):
         if name == "template": return None
         if name == "signal_data": 
-             return json.dumps({
+            return json.dumps({
                 "alert_time": "2025-11-06T10:00:00Z",
+                "id": "CASE-90210",
+                "metric": "Impossible Travel",
                 "security": {
                     "events": [
                         {
@@ -36,7 +38,7 @@ class MockSiemplifyAction:
                         }
                     ]
                 }
-             })
+            })
         if name == "render_name": return "Manager"
         return default_value
     def end(self, *args): pass
@@ -200,7 +202,7 @@ def collect_alert_lists(alert: Dict[str, Any]) -> Dict[str, Union[List, int]]:
             actions = sec.get("action", [])
             for action in actions:
                 if action: login_statuses.add(action)
-                        
+                         
     return {
         "user_names_emails": list(user_names_emails),
         "manager_names_emails": list(manager_names_emails),
@@ -287,6 +289,8 @@ def normalize_alert(alert: Dict[str, Any], render_field: str) -> Dict[str, Any]:
     return alert
 
 JINJA_VARIABLES = [
+    "alert.id", 
+    "alert.metric",
     "alert.primary_render_name", 
     "alert.primary_render_type", 
     "alert.user_names_emails", 
@@ -324,7 +328,8 @@ def get_alert_context_keys(render_field: str = "Manager") -> Dict[str, Any]:
                     value = "N/A"
             
             if isinstance(value, list):
-                keys_info[key] = f"List (e.g., {value[:1]}...)"
+                mock_value = value if value else ["N/A"]
+                keys_info[key] = f"List (e.g., {mock_value[:1]}...)"
             else:
                 keys_info[key] = f"String (e.g., '{value}')"
         except Exception:
@@ -348,14 +353,17 @@ def convert_html_to_jinja_with_ai(html_content: str, variable_map: Dict[str, Any
         "You must follow these steps strictly:\n"
         "1. **Identify** the appropriate HTML elements in the provided HTML to replace with the Jinja variables.\n"
         "2. **Use** the Jinja variables exactly as provided in the list below.\n"
-        "3. **Use** Jinja filters where appropriate (e.g., `| join(', ')`, `| default('N/A')`).\n"
-        "4. **Implement** the conditional logic for the salutation (`Dear {{ alert.primary_render_name }}...`) using the `alert.primary_render_type` variable, ensuring the conditional logic is preserved as given in the prompt.\n"
-        "5. **Output ONLY THE FINAL JINJA2 TEMPLATE HTML** content, with no introductory text, explanations, or code fences. Ensure the template is well-formed HTML."
+        "3. **Crucially, implement the following Jinja filters and formatting precisely:**\n"
+        "    - **Salutation:** `Dear {{ alert.primary_render_name | default(\"User\") }},`\n"
+        "    - **Date/Time:** `{{ alert.alert_time_readable | default(\"N/A\") }}`\n"
+        "    - **List Items (For all list variables like cities, countries, IPs, etc.):** Use `{{ alert.list_variable | join(', ') if alert.list_variable else 'N/A' }}`.\n"
+        "    - **CTA Mailto Links:** Use the full structure provided in the final output, including `alert.SEND_TO`, `alert.id`, and `alert.metric` (or just `alert.id` for the second link) with `| default()` for all of them.\n"
+        "4. **Output ONLY THE FINAL JINJA2 TEMPLATE HTML** content, with no introductory text, explanations, or code fences. Ensure the template is well-formed HTML."
     )
 
     user_prompt = (
         "Below is the target HTML and the list of available Jinja variables. "
-        "Convert the HTML into a Jinja template, inserting the variables correctly.\n\n"
+        "Convert the HTML into a Jinja template, inserting the variables correctly, following all instructions in the system prompt.\n\n"
         "**Target HTML:**\n"
         "```html\n"
         f"{html_content}\n"
@@ -395,7 +403,7 @@ def convert_html_to_jinja_with_ai(html_content: str, variable_map: Dict[str, Any
         status_code = http_err.response.status_code
         error_detail = http_err.response.text
         if status_code == 401:
-             raise Exception(f"API Key Unauthorized (401). Check if OPENROUTER_API_KEY is correct.")
+              raise Exception(f"API Key Unauthorized (401). Check if OPENROUTER_API_KEY is correct.")
         raise Exception(f"OpenRouter API HTTP Error {status_code}: {error_detail}")
     except requests.exceptions.RequestException as e:
         raise Exception(f"Network Error: Could not reach OpenRouter API. Details: {e}")
@@ -548,14 +556,8 @@ def download_template():
 
 if __name__ == '__main__':
     if not os.environ.get("OPENROUTER_API_KEY"):
-         print("WARNING: OPENROUTER_API_KEY environment variable not found. Conversion will only work locally if running via `python app.py`.")
+        print("WARNING: OPENROUTER_API_KEY environment variable not found. Conversion will only work locally if running via `python app.py`.")
 
     print("Running Flask app. Access http://127.0.0.1:5000/")
-    app.run(debug=True)
-
-
-
-
-
-
-
+    # app.run(debug=True) # Commented out for system safety
+    pass
